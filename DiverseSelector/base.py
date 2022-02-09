@@ -24,7 +24,9 @@
 """Base class for diversity based subset selection."""
 
 from abc import ABC, abstractmethod
-
+from sklearn.cluster import KMeans, AffinityPropagation, MeanShift, SpectralClustering, AgglomerativeClustering,\
+    DBSCAN, OPTICS, Birch
+from sklearn.mixture import GaussianMixture
 from .utils import get_features
 
 
@@ -180,6 +182,7 @@ class ClusteringSelectionBase(SelectionBase):
         self.metric = metric
         self.feature_file = feature_file
         self.output = output
+        self.features = get_features(feature_file)
 
         if random_seed is None:
             self.random_seed = 42
@@ -211,6 +214,40 @@ class ClusteringSelectionBase(SelectionBase):
         #         raise ValueError(f"The defined number of clusters {self.num_clusters} is greater "
         #                          f"than {self.enhanced_sampling_weight} of number of selected"
         #                          f"molecules {self.num_selected_mols}.")
+
+    def cluster(self, **params):
+        """
+        Performs clustering based on given algorithm from sklearn library and set of parameters
+        :param params: parameters for the selected method
+        :return: numpy array of labels: np.ndarray:
+        """
+        # todo: features
+        if self.clustering_method == 'k-means':
+            algorithm = KMeans(n_clusters=self.num_clusters, random_state=self.random_seed, **params).fit(self.features)
+        elif self.clustering_method == "affinity propagation":
+            algorithm = AffinityPropagation(random_state=self.random_seed, **params).fit(self.features)
+        elif self.clustering_method == 'mean shift':
+            algorithm = MeanShift(**params).fit(self.features)
+        elif self.clustering_method == 'spectral':
+            algorithm = SpectralClustering(n_clusters=self.num_clusters, **params).fit(self.features)
+        elif self.clustering_method == 'agglomerative':
+            algorithm = AgglomerativeClustering(n_clusters=self.num_clusters,
+                                                affinity=self.metric,
+                                                **params).fit(self.features)
+        elif self.clustering_method == 'DBSCAN':
+            algorithm = DBSCAN(metric_params=self.metric, **params).fit(self.features)
+        elif self.clustering_method == 'OPTICS':
+            algorithm = OPTICS(metric=self.metric, **params).fit(self.features)
+        elif self.clustering_method == 'birch':
+            algorithm = Birch(n_clusters=self.num_clusters, **params).fit(self.features)
+        elif self.clustering_method == "GMM":
+            labels = GaussianMixture(n_components=self.num_clusters, **params).fit_predict(self.features)
+            return labels
+
+        labels = algorithm.labels_
+
+        return labels
+
 
     def select(self):
         """
